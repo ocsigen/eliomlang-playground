@@ -1,0 +1,8 @@
+.depend
+_deps
+*.cmo
+*.cmi
+*.cma
+*.cmxs
+*.cmxa
+*.byte

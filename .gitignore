@@ -6,3 +6,7 @@ _deps
 *.cmxs
 *.cmxa
 *.byte
+*.cmx
+*.a
+*.o
+main.js

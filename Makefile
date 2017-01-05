@@ -20,7 +20,6 @@ OCAMLDEP          := ocamlfind dep
 DEPSDIR := _deps
 
 ifeq ($(DEBUG),yes)
-  GENERATE_DEBUG ?= -g
   DEBUG_JS ?= -jsopt -pretty -jsopt -noinline -jsopt -debuginfo
 endif
 
@@ -32,17 +31,9 @@ CLIENTMODE=-passopt -mode -passopt client
 
 .PHONY: all byte opt
 all: byte
-byte opt:: ${PROJECT_NAME}.js
+byte opt:: main.js
 byte:: ${PROJECT_NAME}.server.byte
 opt:: ${PROJECT_NAME}.server.opt
-
-##----------------------------------------------------------------------
-## Aux
-
-ocamldep=$(shell $(OCAMLDEP) $(1) -sort $(2) $(filter %.eliom %.ml,$(3))))
-
-objs=$(patsubst %.ml,%.$(1),$(patsubst %.eliom,%.$(2).$(1),$(3)))
-depsort=$(call objs,$(1),$(2),$(call ocamldep,-mode $(2),$(3),$(4)))
 
 ##----------------------------------------------------------------------
 
@@ -50,56 +41,69 @@ SERVER_INC := ${addprefix -server-package ,${SERVER_PACKAGES}}
 CLIENT_INC := ${addprefix -client-package ,${CLIENT_PACKAGES}}
 GEN_INC := ${addprefix -package ,${PACKAGES}}
 
+# Packages for link
+SERVER_LINK := ${addprefix -package ,${PACKAGES} ${SERVER_PACKAGES}}
+CLIENT_LINK := ${addprefix -package ,${PACKAGES} ${CLIENT_PACKAGES}}
+
 # Packages for ocamldep
 PPX_INC := ${addprefix -package ,${SERVER_PACKAGES} ${CLIENT_PACKAGES} ${PACKAGES}}
 
 INC=$(GEN_INC) $(SERVER_INC) $(CLIENT_INC)
 
 ##----------------------------------------------------------------------
+## Aux
+
+ocamldep=$(shell $(OCAMLDEP) $(1) -sort $(PPX_INC) $(filter %.ml,$(2))) $(shell $(OCAMLDEP) -sort $(PPX_INC) $(filter %.eliom,$(2)))
+
+objs=$(patsubst %.ml,%.$(1),$(patsubst %.eliom,%.$(2).$(1),$(3)))
+depsort=$(call objs,$(1),$(2),$(call ocamldep,-mode $(2),$(3)))
+
+##----------------------------------------------------------------------
 ## Generic compilation
 
-%.cmi: %.mli
-	${OCAMLC} -c ${INC} $(GENERATE_DEBUG) $<
+%.server.cmi: %.server.mli
+	${OCAMLC} -mode server -c ${INC} -g $<
+%.client.cmi: %.client.mli
+	${OCAMLC} -mode client -c ${INC} -g $<
 %.cmi: %.eliomi
-	${OCAMLC} -c ${INC} $(GENERATE_DEBUG) $<
+	${OCAMLC} -mode eliom -c ${INC} -g $<
 
-%.cmo: %.ml
-	${OCAMLC} -c ${INC} $(GENERATE_DEBUG) $<
-%.cmx: %.ml
-	${OCAMLOPT} -c ${INC} $(GENERATE_DEBUG) $<
+%.server.cmo: %.server.ml
+	${OCAMLC} -mode server -c ${INC} -g $<
+%.server.cmx: %.server.ml
+	${OCAMLOPT} -mode server -c ${INC} -g $<
+%.client.cmo: %.client.ml
+	${OCAMLC} -mode client -c ${INC} -g $<
 
 %.client.cmo %.server.cmo: %.eliom
-	${OCAMLC} -c ${INC} $(GENERATE_DEBUG) $<
+	${OCAMLC} -mode eliom -c ${INC} -g $<
 %.client.cmo %.server.cmx: %.eliom
-	${OCAMLOPT} -c ${INC} $(GENERATE_DEBUG) $<
+	${OCAMLOPT} -mode eliom -c ${INC} -g $<
 
-%.cmxs: %.cmxa
-	$(OCAMLOPT) -shared -linkall -o $@ $(GENERATE_DEBUG) $<
+# %.cmxs: %.cmxa
+# 	$(OCAMLOPT) -shared -linkall -o $@ -g $<
 
-%.byte: %.cma
-	$(CAMLC) $(LINKFLAGS) -o $@ $(GENERATE_DEBUG) $<
+# %.byte: %.cma
+# 	$(OCAMLC) $(LINKFLAGS) -linkall $(INC) -o $@ -g $<
 
 ##----------------------------------------------------------------------
 ## Server side compilation
 
-$(PROJECT_NAME).server.cma: $(call objs,cmo,server,$(SERVER_FILES))
-	${OCAMLC} -a -o $@ $(GENERATE_DEBUG) \
-          $(call depsort,cmo,server,$(INC),$(SERVER_FILES))
+$(PROJECT_NAME).server.byte: $(call objs,cmo,server,$(SERVER_FILES))
+	${OCAMLC} -mode server $(SERVER_LINK) -linkpkg -linkall -o $@ -g $(call depsort,cmo,server,$(SERVER_FILES))
 
-$(PROJECT_NAME).server.cmxa: $(call objs,cmx,server,$(SERVER_FILES))
-	${OCAMLOPT} -a -o $@ $(GENERATE_DEBUG) \
-          $(call depsort,cmx,server,$(INC),$(SERVER_FILES))
+$(PROJECT_NAME).server.opt: $(call objs,cmx,server,$(SERVER_FILES))
+	${OCAMLOPT} -mode server $(SERVER_LINK) -linkpkg -linkall -o $@ -g $(call depsort,cmx,server,$(SERVER_FILES))
 
 
 ##----------------------------------------------------------------------
 ## Client side compilation
 
-$(PROJECT_NAME).js: $(PROJECT_NAME).client.byte
-	${JS_OF_OCAML} -o $@ $(DEBUG_JS) $<
+main.js: $(PROJECT_NAME).client.byte
+	${JS_OF_OCAML} $(JSOO_OPTIONS) -o $@ $(DEBUG_JS) $<
 
-$(PROJECT_NAME).client.cma: $(call objs,cmo,client,$(CLIENT_FILES))
-	${OCAMLC} -a -o $@ $(GENERATE_DEBUG) \
-          $(call depsort,cmo,client,$(INC),$(CLIENT_FILES))
+$(PROJECT_NAME).client.byte: $(call objs,cmo,client,$(CLIENT_FILES))
+	${OCAMLC} -mode client $(CLIENT_LINK) -linkpkg -linkall -o $@ -g $(call depsort,cmo,client,$(CLIENT_FILES))
 
 ##----------------------------------------------------------------------
 ## Dependencies
@@ -111,6 +115,12 @@ include .depend
 
 $(DEPSDIR)/%.depend: % | $(DEPSDIR)
 	$(OCAMLDEP) $(PPX_INC) $< > $@
+$(DEPSDIR)/%.eliom.depend: %.eliom | $(DEPSDIR)
+	$(OCAMLDEP) -mode eliom $(PPX_INC) $< > $@
+$(DEPSDIR)/%.client.ml.depend: %.client.ml | $(DEPSDIR)
+	$(OCAMLDEP) -mode client $(PPX_INC) $< > $@
+$(DEPSDIR)/%.server.ml.depend: %.server.ml | $(DEPSDIR)
+	$(OCAMLDEP) -mode server $(PPX_INC) $< > $@
 
 $(DEPSDIR):
 	mkdir $@
@@ -121,8 +131,7 @@ $(DEPSDIR):
 clean:
 	-rm -f *.cm[ioax] *.cmxa *.cmxs *.o *.a *.annot
 	-rm -f *.type_mli
-	-rm -f ${PROJECT_NAME}.js
-	-rm -rf ${OCAML_CLIENT_DIR} ${OCAML_SERVER_DIR}
+	-rm -f main.js
 
 distclean: clean
-	-rm -rf $(TEST_PREFIX) $(DEPSDIR) .depend
+	-rm -rf $(DEPSDIR) .depend

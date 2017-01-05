@@ -19,8 +19,10 @@ OCAMLDEP          := ocamlfind dep
 
 DEPSDIR := _deps
 
+JSOO_OPTIONS := +eliomlang.runtime.client/eliom.js $(JSOO_OPTIONS)
+
 ifeq ($(DEBUG),yes)
-  DEBUG_JS ?= -jsopt -pretty -jsopt -noinline -jsopt -debuginfo
+  DEBUG_JS ?= --pretty --noinline --debuginfo --source-map
 endif
 
 SERVERMODE=-passopt -mode -passopt server

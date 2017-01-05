@@ -11,12 +11,12 @@ SERVER_FILES := $(wildcard *.eliomi *.eliom *.server.ml *.server.mli)
 CLIENT_FILES := $(wildcard *.eliomi *.eliom *.client.ml *.client.mli)
 
 # OCamlfind packages
-PACKAGES := lwt.ppx js_of_ocaml.deriving.ppx eliomlang.ppx
-SERVER_PACKAGES := eliomlang.runtime.server
-CLIENT_PACKAGES := eliomlang.runtime.client js_of_ocaml.ppx
+PACKAGES := lwt.ppx eliomlang.ppx tyxml containers
+SERVER_PACKAGES := eliomlang.runtime.lwt cohttp.lwt
+CLIENT_PACKAGES := eliomlang.runtime.client js_of_ocaml.tyxml
 
 # Debug application (yes/no): Debugging info in compilation,
 # JavaScript, ocsigenserver
-DEBUG := no
+DEBUG := yes
 
 JSOO_OPTIONS := +weak.js

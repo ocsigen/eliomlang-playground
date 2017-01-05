@@ -1,0 +1,7 @@
+PKG lwt.ppx tyxml containers
+
+# Server
+PKG cohttp.lwt
+
+# Client
+PKG js_of_ocaml.tyxml

@@ -10,3 +10,4 @@ _deps
 *.a
 *.o
 main.js
+*.map
